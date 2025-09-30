@@ -1,10 +1,169 @@
 generator client {
     provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
-    output = "/home/ubuntu/exai_mcp_ui/app/node_modules/.prisma/client"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "windows"]
 }
 
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+    id            String    @id @default(cuid())
+    email         String    @unique
+    name          String?
+    password      String
+    role          Role      @default(USER)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    conversations Conversation[]
+    files         File[]
+    settings      UserSettings?
+    sessions      Session[]
+
+    @@index([email])
+}
+
+enum Role {
+    USER
+    ADMIN
+    SUPER_ADMIN
+}
+
+// Conversation model for chat sessions
+model Conversation {
+    id            String    @id @default(cuid())
+    title         String?
+    toolType      String    // 'chat', 'debug', 'analyze', etc.
+    userId        String
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages      Message[]
+    workflows     Workflow[]
+    files         File[]
+
+    @@index([userId])
+    @@index([toolType])
+    @@index([createdAt])
+}
+
+// Message model for individual messages
+model Message {
+    id              String    @id @default(cuid())
+    role            String    // 'user' | 'assistant' | 'system'
+    content         String    @db.Text
+    conversationId  String
+    metadata        Json?     // For storing additional data
+    createdAt       DateTime  @default(now())
+
+    conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    attachments     MessageAttachment[]
+
+    @@index([conversationId])
+    @@index([createdAt])
+}
+
+// Workflow model for multi-step tool executions
+model Workflow {
+    id              String    @id @default(cuid())
+    conversationId  String
+    toolType        String    // 'debug', 'analyze', 'codereview', etc.
+    status          String    // 'pending' | 'running' | 'completed' | 'failed'
+    currentStep     Int       @default(1)
+    totalSteps      Int
+    continuationId  String?
+    result          Json?     // Final result when completed
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    steps           WorkflowStep[]
+
+    @@index([conversationId])
+    @@index([status])
+    @@index([toolType])
+}
+
+// WorkflowStep model for individual steps in a workflow
+model WorkflowStep {
+    id          String    @id @default(cuid())
+    workflowId  String
+    stepNumber  Int
+    findings    String    @db.Text
+    hypothesis  String?   @db.Text
+    confidence  String?   // 'exploring' | 'low' | 'medium' | 'high' | 'very_high' | 'almost_certain' | 'certain'
+    status      String    // 'pending' | 'running' | 'completed'
+    metadata    Json?     // For storing step-specific data
+    createdAt   DateTime  @default(now())
+
+    workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+    files       File[]
+
+    @@index([workflowId])
+    @@index([stepNumber])
+}
+
+// File model for uploaded files
+model File {
+    id              String    @id @default(cuid())
+    name            String
+    size            Int
+    type            String
+    url             String
+    userId          String
+    conversationId  String?
+    workflowStepId  String?
+    createdAt       DateTime  @default(now())
+
+    user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+    workflowStep    WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+    attachments     MessageAttachment[]
+
+    @@index([userId])
+    @@index([conversationId])
+    @@index([workflowStepId])
+}
+
+// MessageAttachment junction table
+model MessageAttachment {
+    id        String   @id @default(cuid())
+    messageId String
+    fileId    String
+
+    message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+    @@unique([messageId, fileId])
+    @@index([messageId])
+    @@index([fileId])
+}
+
+// UserSettings model for user preferences
+model UserSettings {
+    id                  String   @id @default(cuid())
+    userId              String   @unique
+    defaultModel        String   @default("glm-4.5-flash")
+    defaultThinkingMode String   @default("medium")
+    webSearchEnabled    Boolean  @default(true)
+    theme               String   @default("system")
+    preferences         Json?    // For additional custom preferences
+
+    user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Session model for NextAuth.js
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
