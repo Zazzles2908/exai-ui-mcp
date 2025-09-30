@@ -110,6 +110,17 @@ CREATE TABLE IF NOT EXISTS exai_user_settings (
 
 CREATE INDEX idx_exai_user_settings_user_id ON exai_user_settings(user_id);
 
+-- EXAI Sessions Table (for NextAuth compatibility)
+CREATE TABLE IF NOT EXISTS exai_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_token TEXT NOT NULL UNIQUE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    expires TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX idx_exai_sessions_user_id ON exai_sessions(user_id);
+CREATE INDEX idx_exai_sessions_session_token ON exai_sessions(session_token);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE exai_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exai_messages ENABLE ROW LEVEL SECURITY;
@@ -118,6 +129,7 @@ ALTER TABLE exai_workflow_steps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exai_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exai_message_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exai_user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exai_sessions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for exai_conversations
 CREATE POLICY "Users can view own conversations" ON exai_conversations
@@ -230,6 +242,19 @@ CREATE POLICY "Users can create own settings" ON exai_user_settings
 
 CREATE POLICY "Users can update own settings" ON exai_user_settings
     FOR UPDATE USING (auth.uid() = user_id);
+
+-- RLS Policies for exai_sessions
+CREATE POLICY "Users can view own sessions" ON exai_sessions
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own sessions" ON exai_sessions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own sessions" ON exai_sessions
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own sessions" ON exai_sessions
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

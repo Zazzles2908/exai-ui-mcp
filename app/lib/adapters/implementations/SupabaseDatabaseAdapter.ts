@@ -277,8 +277,301 @@ export class SupabaseDatabaseAdapter implements IDatabaseAdapter {
     if (error) throw error
   }
 
-  // Workflow operations - Similar pattern continues...
-  // (Implementing remaining methods following the same pattern)
+  // Workflow operations
+  async createWorkflow(data: CreateWorkflowInput): Promise<Workflow> {
+    const { data: workflow, error } = await this.supabase
+      .from('exai_workflows')
+      .insert({
+        conversation_id: data.conversationId,
+        tool_type: data.toolType,
+        status: data.status,
+        current_step: data.currentStep,
+        total_steps: data.totalSteps,
+        continuation_id: data.continuationId,
+        result: data.result,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapWorkflow(workflow)
+  }
+
+  async getWorkflow(id: string): Promise<Workflow | null> {
+    const { data, error } = await this.supabase
+      .from('exai_workflows')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) return null
+    return this.mapWorkflow(data)
+  }
+
+  async getWorkflows(conversationId: string): Promise<Workflow[]> {
+    const { data, error } = await this.supabase
+      .from('exai_workflows')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []).map(this.mapWorkflow)
+  }
+
+  async updateWorkflow(id: string, data: UpdateWorkflowInput): Promise<Workflow> {
+    const { data: workflow, error } = await this.supabase
+      .from('exai_workflows')
+      .update({
+        status: data.status,
+        current_step: data.currentStep,
+        total_steps: data.totalSteps,
+        continuation_id: data.continuationId,
+        result: data.result,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapWorkflow(workflow)
+  }
+
+  async deleteWorkflow(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('exai_workflows')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  }
+
+  // WorkflowStep operations
+  async createWorkflowStep(data: CreateWorkflowStepInput): Promise<WorkflowStep> {
+    const { data: step, error } = await this.supabase
+      .from('exai_workflow_steps')
+      .insert({
+        workflow_id: data.workflowId,
+        step_number: data.stepNumber,
+        findings: data.findings,
+        hypothesis: data.hypothesis,
+        confidence: data.confidence,
+        status: data.status,
+        metadata: data.metadata,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapWorkflowStep(step)
+  }
+
+  async getWorkflowStep(id: string): Promise<WorkflowStep | null> {
+    const { data, error } = await this.supabase
+      .from('exai_workflow_steps')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) return null
+    return this.mapWorkflowStep(data)
+  }
+
+  async getWorkflowSteps(workflowId: string): Promise<WorkflowStep[]> {
+    const { data, error } = await this.supabase
+      .from('exai_workflow_steps')
+      .select('*')
+      .eq('workflow_id', workflowId)
+      .order('step_number', { ascending: true })
+
+    if (error) throw error
+    return (data || []).map(this.mapWorkflowStep)
+  }
+
+  async deleteWorkflowStep(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('exai_workflow_steps')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  }
+
+  // File operations
+  async createFile(data: CreateFileInput): Promise<File> {
+    const { data: file, error } = await this.supabase
+      .from('exai_files')
+      .insert({
+        name: data.name,
+        size: data.size,
+        type: data.type,
+        url: data.url,
+        user_id: data.userId,
+        conversation_id: data.conversationId,
+        workflow_step_id: data.workflowStepId,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapFile(file)
+  }
+
+  async getFile(id: string): Promise<File | null> {
+    const { data, error } = await this.supabase
+      .from('exai_files')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) return null
+    return this.mapFile(data)
+  }
+
+  async getFiles(
+    userId: string,
+    options?: { conversationId?: string; limit?: number; offset?: number }
+  ): Promise<File[]> {
+    let query = this.supabase
+      .from('exai_files')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (options?.conversationId) {
+      query = query.eq('conversation_id', options.conversationId)
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit)
+    }
+
+    if (options?.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 50) - 1)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+    return (data || []).map(this.mapFile)
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('exai_files')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  }
+
+  // UserSettings operations
+  async createUserSettings(data: CreateUserSettingsInput): Promise<UserSettings> {
+    const { data: settings, error } = await this.supabase
+      .from('exai_user_settings')
+      .insert({
+        user_id: data.userId,
+        default_model: data.defaultModel,
+        default_thinking_mode: data.defaultThinkingMode,
+        web_search_enabled: data.webSearchEnabled,
+        theme: data.theme,
+        preferences: data.preferences,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapUserSettings(settings)
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | null> {
+    const { data, error } = await this.supabase
+      .from('exai_user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (error || !data) return null
+    return this.mapUserSettings(data)
+  }
+
+  async updateUserSettings(userId: string, data: UpdateUserSettingsInput): Promise<UserSettings> {
+    const { data: settings, error } = await this.supabase
+      .from('exai_user_settings')
+      .update({
+        default_model: data.defaultModel,
+        default_thinking_mode: data.defaultThinkingMode,
+        web_search_enabled: data.webSearchEnabled,
+        theme: data.theme,
+        preferences: data.preferences,
+      })
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapUserSettings(settings)
+  }
+
+  // Session operations (using Supabase Auth sessions)
+  async createSession(data: CreateSessionInput): Promise<Session> {
+    // Note: Supabase handles sessions internally via auth
+    // This is a compatibility layer for NextAuth
+    const { data: session, error } = await this.supabase
+      .from('exai_sessions')
+      .insert({
+        session_token: data.sessionToken,
+        user_id: data.userId,
+        expires: data.expires.toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapSession(session)
+  }
+
+  async getSession(sessionToken: string): Promise<Session | null> {
+    const { data, error } = await this.supabase
+      .from('exai_sessions')
+      .select('*')
+      .eq('session_token', sessionToken)
+      .single()
+
+    if (error || !data) return null
+    return this.mapSession(data)
+  }
+
+  async updateSession(sessionToken: string, expires: Date): Promise<Session> {
+    const { data: session, error } = await this.supabase
+      .from('exai_sessions')
+      .update({ expires: expires.toISOString() })
+      .eq('session_token', sessionToken)
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.mapSession(session)
+  }
+
+  async deleteSession(sessionToken: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('exai_sessions')
+      .delete()
+      .eq('session_token', sessionToken)
+
+    if (error) throw error
+  }
+
+  async deleteExpiredSessions(): Promise<void> {
+    const { error } = await this.supabase
+      .from('exai_sessions')
+      .delete()
+      .lt('expires', new Date().toISOString())
+
+    if (error) throw error
+  }
 
   // Helper methods to map Supabase data to our types
   private mapConversation(data: any): Conversation {
@@ -303,6 +596,70 @@ export class SupabaseDatabaseAdapter implements IDatabaseAdapter {
     }
   }
 
+  private mapWorkflow(data: any): Workflow {
+    return {
+      id: data.id,
+      conversationId: data.conversation_id,
+      toolType: data.tool_type,
+      status: data.status,
+      currentStep: data.current_step,
+      totalSteps: data.total_steps,
+      continuationId: data.continuation_id,
+      result: data.result,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+    }
+  }
+
+  private mapWorkflowStep(data: any): WorkflowStep {
+    return {
+      id: data.id,
+      workflowId: data.workflow_id,
+      stepNumber: data.step_number,
+      findings: data.findings,
+      hypothesis: data.hypothesis,
+      confidence: data.confidence,
+      status: data.status,
+      metadata: data.metadata,
+      createdAt: new Date(data.created_at),
+    }
+  }
+
+  private mapFile(data: any): File {
+    return {
+      id: data.id,
+      name: data.name,
+      size: data.size,
+      type: data.type,
+      url: data.url,
+      userId: data.user_id,
+      conversationId: data.conversation_id,
+      workflowStepId: data.workflow_step_id,
+      createdAt: new Date(data.created_at),
+    }
+  }
+
+  private mapUserSettings(data: any): UserSettings {
+    return {
+      id: data.id,
+      userId: data.user_id,
+      defaultModel: data.default_model,
+      defaultThinkingMode: data.default_thinking_mode,
+      webSearchEnabled: data.web_search_enabled,
+      theme: data.theme,
+      preferences: data.preferences,
+    }
+  }
+
+  private mapSession(data: any): Session {
+    return {
+      id: data.id,
+      sessionToken: data.session_token,
+      userId: data.user_id,
+      expires: new Date(data.expires),
+    }
+  }
+
   // Utility operations
   async healthCheck(): Promise<boolean> {
     try {
@@ -316,8 +673,5 @@ export class SupabaseDatabaseAdapter implements IDatabaseAdapter {
   async disconnect(): Promise<void> {
     // Supabase client doesn't require explicit disconnection
   }
-
-  // Implement remaining methods (Workflow, WorkflowStep, File, UserSettings, Session)
-  // Following the same pattern as above...
 }
 

@@ -9,6 +9,8 @@ import { IExaiAdapter } from './interfaces/IExaiAdapter'
 import { IDatabaseAdapter } from './interfaces/IDatabaseAdapter'
 import { LocalExaiAdapter } from './implementations/LocalExaiAdapter'
 import { LocalDatabaseAdapter } from './implementations/LocalDatabaseAdapter'
+import { SupabaseExaiAdapter } from './implementations/SupabaseExaiAdapter'
+import { SupabaseDatabaseAdapter } from './implementations/SupabaseDatabaseAdapter'
 import { prisma } from '../db'
 
 export type AdapterMode = 'local' | 'supabase'
@@ -50,8 +52,8 @@ export class AdapterFactory {
         break
 
       case 'supabase':
-        // TODO: Implement SupabaseExaiAdapter when migrating to Supabase
-        throw new Error('Supabase EXAI adapter not yet implemented')
+        this.exaiAdapter = new SupabaseExaiAdapter()
+        break
 
       default:
         throw new Error(`Unsupported adapter mode: ${mode}`)
@@ -79,8 +81,8 @@ export class AdapterFactory {
         break
 
       case 'supabase':
-        // TODO: Implement SupabaseDatabaseAdapter when migrating to Supabase
-        throw new Error('Supabase database adapter not yet implemented')
+        this.databaseAdapter = new SupabaseDatabaseAdapter()
+        break
 
       default:
         throw new Error(`Unsupported adapter mode: ${mode}`)
